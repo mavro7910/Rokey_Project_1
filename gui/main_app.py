@@ -12,6 +12,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.setupUi(self)
 
         self.current_image_path = None
+        self.ui.tableResults.cellDoubleClicked.connect(self._on_row_dbl_clicked)
 
         # 버튼 이벤트 연결
         self.ui.btnUpload.clicked.connect(self.on_upload_image)
@@ -78,7 +79,6 @@ class MainWindow(QtWidgets.QMainWindow):
             t.setItem(r, 4, QtWidgets.QTableWidgetItem(desc or ""))           # Description
             t.setItem(r, 5, QtWidgets.QTableWidgetItem(created_at or ""))     # Data(=created_at)
 
-        t.cellDoubleClicked.connect(self._on_row_dbl_clicked)
 
     # ---------- 보조 ----------
     def _set_preview(self, path: str):
