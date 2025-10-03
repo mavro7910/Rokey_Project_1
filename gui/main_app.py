@@ -15,6 +15,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
 
+        # --- 테이블 컬럼 비율 조정 ---
+        header = self.ui.tableResults.horizontalHeader()
+        header.setSectionResizeMode(QtWidgets.QHeaderView.Stretch)  # 전체 폭을 꽉 채움
+
+        # 열별 모드 지정
+        header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)  # ID: 내용에 맞게
+        header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)  # File: 비율로 늘어남
+        header.setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeToContents)  # Label: 내용에 맞게
+        header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents)  # Confidence: 내용에 맞게
+        header.setSectionResizeMode(4, QtWidgets.QHeaderView.Stretch)           # Description: 넓게 차지
+        header.setSectionResizeMode(5, QtWidgets.QHeaderView.ResizeToContents)  # Data: 최소한만
+
         # 현재 단일 파일 상태
         self.current_image_path = None
 
