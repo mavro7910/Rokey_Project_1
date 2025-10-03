@@ -283,14 +283,23 @@ class MainWindow(QtWidgets.QMainWindow):
             r = t.rowCount()
             t.insertRow(r)
 
-            t.setItem(r, 0, QtWidgets.QTableWidgetItem(str(rid)))
-            name_item = QtWidgets.QTableWidgetItem(file_name or "")
-            name_item.setData(QtCore.Qt.UserRole, image_path or "")
-            t.setItem(r, 1, name_item)
+            # ✅ ID: 숫자 정렬 (핵심!)
+            item_id = QtWidgets.QTableWidgetItem()
+            item_id.setData(QtCore.Qt.EditRole, int(rid))     # 또는 QtCore.Qt.DisplayRole
+            t.setItem(r, 0, item_id)
+
+            t.setItem(r, 1, QtWidgets.QTableWidgetItem(file_name or ""))
             t.setItem(r, 2, QtWidgets.QTableWidgetItem(defect_type or ""))
             t.setItem(r, 3, QtWidgets.QTableWidgetItem(severity or ""))
             t.setItem(r, 4, QtWidgets.QTableWidgetItem(location or ""))
-            t.setItem(r, 5, QtWidgets.QTableWidgetItem("" if score is None else f"{float(score)*100:.1f}"))
+            
+            item_score = QtWidgets.QTableWidgetItem()
+            val = 0.0 if score is None else float(score) * 100.0
+            item_score.setData(QtCore.Qt.EditRole, val)       # 숫자 값으로 정렬
+            item_score.setText(f"{val:.1f}")                  # 표시 형식 고정
+            item_score.setTextAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+            t.setItem(r, 5, item_score)
+            
             t.setItem(r, 6, QtWidgets.QTableWidgetItem(detail or ""))
             t.setItem(r, 7, QtWidgets.QTableWidgetItem(action or ""))
             t.setItem(r, 8, QtWidgets.QTableWidgetItem(ts or ""))
