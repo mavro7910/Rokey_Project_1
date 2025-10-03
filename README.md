@@ -44,7 +44,7 @@ OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxx
 DB_PATH=app.db
 👉 DB_PATH는 생략 시 app.db 기본값을 사용합니다.
 👉 API Key는 OpenAI 계정에서 발급받아야 합니다.
-'''
+```
 
 ## 📂 데이터셋 출처
 본 프로젝트에서는 CarDD (Car Damage Dataset) 를 활용하여 GPT-4o mini 기반 분류 실험을 진행합니다.
