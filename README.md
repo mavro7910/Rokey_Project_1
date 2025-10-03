@@ -53,7 +53,7 @@ CarDD는 차량 외장 손상 이미지 약 4,000장을 포함하고 있으며, 
 
 - [CarDD 공식 페이지](https://cardd-ustc.github.io/?utm_source=chatgpt.com)
 
-## ⚙️ 전체 흐름
+## 🔁 전체 흐름
 
 1. 이미지 업로드
 2. 프롬프트(분류 요청) 전달
