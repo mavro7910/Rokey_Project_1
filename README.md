@@ -46,11 +46,12 @@ DB_PATH=app.db
 ```
 
 ## 📂 데이터셋 출처
-본 프로젝트에서는 CarDD (Car Damage Dataset) 를 활용하여 GPT-4o mini 기반 분류 실험을 진행합니다.
+
+본 프로젝트에서는 **CarDD (Car Damage Dataset)** 를 활용하여 GPT-4o mini 기반 분류 실험을 진행합니다.
 
 CarDD는 차량 외장 손상 이미지 약 4,000장을 포함하고 있으며, 스크래치, 찌그러짐, 페인트 손상 등 다양한 불량 유형을 포함합니다.
 
-CarDD 공식 페이지
+- [CarDD 공식 페이지](https://cardd-ustc.github.io/?utm_source=chatgpt.com)
 
 ## 🔁 전체 흐름
 이미지 업로드 (단일/폴더)
