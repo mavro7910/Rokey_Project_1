@@ -26,13 +26,40 @@ DEFAULT_DEFECT_LABELS = os.getenv(
     "DEFECT_LABELS",
     "scratch, crack, dent, discoloration, contamination, misalignment, missing_part, burr, deformation, none"
 )
+
+# 라벨을 리스트로 사용 가능하도록 변환
+DEFECT_LABELS = [lbl.strip() for lbl in DEFAULT_DEFECT_LABELS.split(",") if lbl.strip()]
+
 CLASSIFY_PROMPT = os.getenv(
     "CLASSIFY_PROMPT",
     f"""
-다음 이미지의 불량 유형을 아래 라벨 중 하나로 분류하고, 신뢰도(0~1)와 간단 설명을 한국어로 작성하라.
-라벨 목록: {DEFAULT_DEFECT_LABELS}
+다음 자동차 이미지를 분석하여 JSON으로만 결과를 출력하라.
+
+필드 요구사항:
+- label: 아래 라벨 목록 중 하나 (단일 값)
+  라벨 목록: {DEFAULT_DEFECT_LABELS}
+- confidence: 0~1 사이 숫자
+- description: 한국어로 간단 설명
+- severity: A/B/C 중 하나 (A=치명적, B=중대, C=경미)
+- location: 결함이 발생한 자동차 부위 (예: front bumper, rear bumper, hood, trunk, left door, right door, roof, windshield 등)
+- action: Pass / Rework / Scrap / Hold / Reject 중 하나
 
 반드시 아래 JSON 형식으로만 출력하라(추가 텍스트 금지):
-{{"label":"<라벨>","confidence":<0~1 숫자>,"description":"<한국어 설명>"}}
+{{
+  "label":"<라벨>",
+  "confidence":<0~1 숫자>,
+  "description":"<한국어 설명>",
+  "severity":"<A|B|C>",
+  "location":"<부위 텍스트>",
+  "action":"<Pass|Rework|Scrap|Hold|Reject>"
+}}
 """
 )
+
+SEVERITY_UI = ["High", "Medium", "Low"]
+SEVERITY_MAP = {
+    "High": "A",
+    "Medium": "B",
+    "Low": "C"
+}
+SEVERITY_MAP_REVERSE = {v: k for k, v in SEVERITY_MAP.items()}
