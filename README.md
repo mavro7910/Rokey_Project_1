@@ -53,13 +53,16 @@ CarDD는 차량 외장 손상 이미지 약 4,000장을 포함하고 있으며, 
 
 - [CarDD 공식 페이지](https://cardd-ustc.github.io/?utm_source=chatgpt.com)
 
-## 전체 흐름
+## ⚙️ 전체 흐름
 
 1. 이미지 업로드
 2. 프롬프트(분류 요청) 전달
 3. GPT-4o-mini를 통한 불량 유형 분류/설명
 4. 결과 출력 및 SQLite DB 저장
 5. 검색 기능으로 불량 유형/날짜별 탐색
+
+## 🖼 실행 화면
+![Main UI](images/example.png)
 
 ## 🔧 시스템 구성도
 ```css
