@@ -185,3 +185,20 @@ def delete_results(ids):
     n = cur.rowcount
     conn.close()
     return n
+
+def update_image_path(record_id: int, new_path: str) -> bool:
+    """
+    특정 레코드의 image_path를 새로운 경로(new_path)로 갱신한다.
+    성공 시 True, 실패 시 False 반환.
+    """
+    ensure_schema()
+    from pathlib import Path
+    abs_path = str(Path(new_path).resolve())
+
+    conn = _connect()
+    cur = conn.cursor()
+    cur.execute("UPDATE results SET image_path=? WHERE id=?", (abs_path, record_id))
+    conn.commit()
+    ok = cur.rowcount == 1
+    conn.close()
+    return ok

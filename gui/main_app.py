@@ -138,8 +138,9 @@ class MainWindow(QtWidgets.QMainWindow):
             location = "none"
 
         try:
+            abs_path = str(Path(self.current_image_path).resolve())
             upsert_result(
-                self.current_image_path,
+                abs_path,
                 defect_type,
                 severity,
                 location,  
@@ -237,8 +238,9 @@ class MainWindow(QtWidgets.QMainWindow):
                     severity = "C"
                     location = "none"
 
+                abs_path = str(Path(fpath).resolve())
                 insert_result(
-                    image_path=fpath,
+                    image_path=abs_path,
                     defect_type=label,
                     severity=severity,
                     location=location, 
@@ -283,23 +285,33 @@ class MainWindow(QtWidgets.QMainWindow):
             r = t.rowCount()
             t.insertRow(r)
 
-            # ✅ ID: 숫자 정렬 (핵심!)
+            # ID: 숫자 정렬 되도록 EditRole에 int로 저장
             item_id = QtWidgets.QTableWidgetItem()
-            item_id.setData(QtCore.Qt.EditRole, int(rid))     # 또는 QtCore.Qt.DisplayRole
+            item_id.setData(QtCore.Qt.EditRole, int(rid))
             t.setItem(r, 0, item_id)
 
-            t.setItem(r, 1, QtWidgets.QTableWidgetItem(file_name or ""))
+            # File Name: 표시 텍스트 + UserRole에 '절대경로' 저장
+            try:
+                abs_image_path = str(Path(image_path).resolve())
+            except Exception:
+                abs_image_path = image_path or ""
+
+            name_item = QtWidgets.QTableWidgetItem(file_name or "")
+            name_item.setData(QtCore.Qt.UserRole, abs_image_path)  # ← 더블클릭 시 이 경로 사용
+            t.setItem(r, 1, name_item)
+
             t.setItem(r, 2, QtWidgets.QTableWidgetItem(defect_type or ""))
             t.setItem(r, 3, QtWidgets.QTableWidgetItem(severity or ""))
             t.setItem(r, 4, QtWidgets.QTableWidgetItem(location or ""))
-            
+
+            # Score: 숫자 정렬 (표시는 %)
             item_score = QtWidgets.QTableWidgetItem()
             val = 0.0 if score is None else float(score) * 100.0
-            item_score.setData(QtCore.Qt.EditRole, val)       # 숫자 값으로 정렬
-            item_score.setText(f"{val:.1f}")                  # 표시 형식 고정
+            item_score.setData(QtCore.Qt.EditRole, val)
+            item_score.setText(f"{val:.1f}")
             item_score.setTextAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
             t.setItem(r, 5, item_score)
-            
+
             t.setItem(r, 6, QtWidgets.QTableWidgetItem(detail or ""))
             t.setItem(r, 7, QtWidgets.QTableWidgetItem(action or ""))
             t.setItem(r, 8, QtWidgets.QTableWidgetItem(ts or ""))
@@ -307,7 +319,6 @@ class MainWindow(QtWidgets.QMainWindow):
         t.setSortingEnabled(sorting)
         t.setUpdatesEnabled(True)
         t.viewport().update()
-        QtWidgets.QApplication.processEvents()
 
     # -------- 미리보기 --------
     def _set_preview(self, path: str):
@@ -324,19 +335,31 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ui.lblImage.setPixmap(QtGui.QPixmap(self.current_image_path))
 
     def _on_row_dbl_clicked(self, row, col):
+        # File Name 셀
         name_item = self.ui.tableResults.item(row, 1)
         if not name_item:
             return
-        fpath = name_item.data(QtCore.Qt.UserRole) or ""
+
+        # ① UserRole(절대경로) → ② 셀 텍스트 → ③ 절대경로 변환 순으로 폴백
+        fpath = name_item.data(QtCore.Qt.UserRole) or name_item.text() or ""
+        try:
+            fpath = str(Path(fpath).resolve())
+        except Exception:
+            pass
+
+        # Detail 패널 동기화
         detail_item = self.ui.tableResults.item(row, 6)
-        self.ui.txtResult.setPlainText(detail_item.text() if detail_item else "")
+        if detail_item:
+            self.ui.txtResult.setPlainText(detail_item.text())
+
         if QtCore.QFileInfo(fpath).exists():
             self._batch_files = []
             self._batch_idx = -1
             self.current_image_path = fpath
             self._set_preview(fpath)
         else:
-            QtWidgets.QMessageBox.warning(self, "경고", "로컬에 이미지 파일이 없습니다.")
+            # 경로를 함께 보여줘서 디버깅 쉽게
+            QtWidgets.QMessageBox.warning(self, "경고", f"로컬에 이미지 파일이 없습니다:\n{fpath}")
 
     # -------- 툴바 (검색/삭제) --------
     def _ensure_toolbar_for_search_and_delete(self):
