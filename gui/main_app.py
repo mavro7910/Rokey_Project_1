@@ -3,7 +3,8 @@ from gui.main_window import Ui_MainWindow
 
 from utils.file_handler import get_image_file
 from api.openai_api import classify_image
-from db.db import insert_note, fetch_notes
+from db.db import insert_note, fetch_notes, ensure_schema, search_notes, delete_notes, get_db_path
+import sqlite3
 
 # 추가: 표준 라이브러리
 from pathlib import Path
@@ -36,8 +37,18 @@ class MainWindow(QtWidgets.QMainWindow):
         t.setEditTriggers(t.NoEditTriggers)
         t.horizontalHeader().setStretchLastSection(True)
 
-        # === 추가: 툴바 & "Upload Folder…" 액션 (UI 수정 없이 폴더 업로드 제공) ===
-        self._ensure_toolbar_for_folder_upload()
+        # 툴바 검색, 삭제
+        self._ensure_toolbar_for_search_and_delete()
+
+        # 마지막 검색 조건
+        self._last_search = None  # {'label':..., 'keyword':..., 'date_from':..., 'date_to':...} or None
+
+    try:
+        ensure_schema()  # 파라미터 없이 호출
+        print("[DB PATH]", get_db_path())
+    except Exception as e:
+        print("[DB] ensure_schema error:", e)
+
 
     # ---------- 이벤트 ----------
     def on_upload_image(self):
@@ -79,30 +90,26 @@ class MainWindow(QtWidgets.QMainWindow):
             confidence = self._last_classify.get("confidence")
 
         try:
-            insert_note(self.current_image_path, desc, label, confidence)
-            QtWidgets.QMessageBox.information(self, "완료", "DB에 저장했습니다.")
+            print(f"[SAVE] path={self.current_image_path}, label={label}, conf={confidence}, desc_len={len(desc)}")
+            # insert_note가 성공/중복을 리턴하지 않는다면 그대로 호출하고 except만 잡아도 ok
+            res = insert_note(self.current_image_path, desc, label, confidence)
+            # res가 None일 수도 있으니 메시지만 일단 성공으로 처리
+            QtWidgets.QMessageBox.information(self, "완료", "DB에 저장 시도 완료.")
         except Exception as e:
-            print("[ERROR][on_save]", e)  # 콘솔 로그
+            print("[ERROR][on_save]", e)
             QtWidgets.QMessageBox.critical(self, "DB 오류", f"저장 중 오류 발생: {e}")
             return
 
-        self.on_view_results()
+        self._refresh_results()
         self._advance_batch_if_any()
 
+
+
     def on_view_results(self):
-        rows = fetch_notes(limit=200)  # (id, image_path, label, confidence, description, created_at)
-        t = self.ui.tableResults
-        t.setRowCount(0)
-        for rid, fpath, label, conf, desc, created_at in rows:
-            r = t.rowCount()
-            t.insertRow(r)
-            t.setItem(r, 0, QtWidgets.QTableWidgetItem(str(rid)))             # ID
-            t.setItem(r, 1, QtWidgets.QTableWidgetItem(fpath))                # File
-            t.setItem(r, 2, QtWidgets.QTableWidgetItem(label or ""))          # Label
-            # conf가 None이면 빈칸, 숫자면 소수점 2자리 포맷
-            t.setItem(r, 3, QtWidgets.QTableWidgetItem("" if conf is None else f"{float(conf):.2f}"))
-            t.setItem(r, 4, QtWidgets.QTableWidgetItem(desc or ""))           # Description
-            t.setItem(r, 5, QtWidgets.QTableWidgetItem(created_at or ""))     # Date(=created_at)
+        rows = fetch_notes(limit=200)
+        self._last_search = None  # 전체 보기 모드
+        self._render_rows(rows)
+
 
     # ---------- 폴더 업로드 핵심 ----------
     def on_upload_folder(self):
@@ -144,7 +151,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
 
         # 진행률 다이얼로그
-        prog = QtWidgets.QProgressDialog("폴더 일괄 판정/저장 중…", "취소", 0, len(unique_paths), self)
+        prog = QtWidgets.QProgressDialog("폴더 내 일괄 판정/저장 중…", "취소", 0, len(unique_paths), self)
         prog.setWindowModality(QtCore.Qt.WindowModal)
         prog.setMinimumDuration(300)
 
@@ -180,7 +187,6 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QApplication.processEvents()
 
         prog.close()
-        self.on_view_results()
 
         QtWidgets.QMessageBox.information(
             self, "완료",
@@ -189,6 +195,7 @@ class MainWindow(QtWidgets.QMainWindow):
             + (", 취소됨" if saved + errors < len(unique_paths) else "")
         )
 
+        self._refresh_results()
 
     # ---------- 보조 ----------
     def _set_preview(self, path: str):
@@ -218,19 +225,6 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.warning(self, "경고", "로컬에 이미지 파일이 없습니다.")
 
     # === 추가: 도우미들 ===
-    def _ensure_toolbar_for_folder_upload(self):
-        """UI 파일을 안 고치고도 'Upload Folder…' 액션을 제공"""
-        # 이미 툴바가 있다면 그대로 사용, 없으면 생성
-        if not self.findChildren(QtWidgets.QToolBar):
-            tb = QtWidgets.QToolBar("Main", self)
-            self.addToolBar(tb)
-        else:
-            tb = self.findChildren(QtWidgets.QToolBar)[0]
-
-        act = QtWidgets.QAction("Upload Folder…", self)
-        act.setShortcut("Ctrl+Shift+U")
-        act.triggered.connect(self.on_upload_folder)
-        tb.addAction(act)
 
     def _is_image_file(self, path: Path) -> bool:
         return path.suffix.lower() in {
@@ -256,3 +250,163 @@ class MainWindow(QtWidgets.QMainWindow):
         # 직전 분류 결과 캐시 초기화
         if hasattr(self, "_last_classify"):
             delattr(self, "_last_classify")
+
+    # 툴바 액션 하나로 간단한 폼 다이얼로그 띄워서 날짜/라벨/키워드 입력받고 테이블 갱신
+    def _ensure_toolbar_for_search_and_delete(self):
+        # 툴바 확보
+        if not self.findChildren(QtWidgets.QToolBar):
+            tb = QtWidgets.QToolBar("Main", self)
+            self.addToolBar(tb)
+        else:
+            tb = self.findChildren(QtWidgets.QToolBar)[0]
+
+        # 검색
+        self.actSearch = QtWidgets.QAction("Search…", self)
+        self.actSearch.setShortcut("Ctrl+F")
+        self.actSearch.triggered.connect(self.on_search_dialog)
+        tb.addAction(self.actSearch)
+        self.addAction(self.actSearch)
+
+        # 삭제
+        self.actDelete = QtWidgets.QAction("Delete Selected", self)
+        self.actDelete.setShortcut("Del")
+        self.actDelete.triggered.connect(self.on_delete_selected)
+        tb.addAction(self.actDelete)
+        self.addAction(self.actDelete)
+
+    # 검색 다이얼로그 & 실행
+    def on_search_dialog(self):
+        dlg = QtWidgets.QDialog(self)
+        dlg.setWindowTitle("Search")
+        form = QtWidgets.QFormLayout(dlg)
+
+        edtLabel = QtWidgets.QLineEdit(dlg)     # 라벨(정확 일치)
+        edtKeyword = QtWidgets.QLineEdit(dlg)   # 키워드 (부분 일치)
+        edtFrom = QtWidgets.QDateEdit(dlg); edtFrom.setCalendarPopup(True); edtFrom.setDisplayFormat("yyyy-MM-dd"); edtFrom.setDate(QtCore.QDate.currentDate().addMonths(-1))
+        edtTo = QtWidgets.QDateEdit(dlg); edtTo.setCalendarPopup(True); edtTo.setDisplayFormat("yyyy-MM-dd"); edtTo.setDate(QtCore.QDate.currentDate())
+
+        form.addRow("Label (exact):", edtLabel)
+        form.addRow("Keyword:", edtKeyword)
+        form.addRow("From (YYYY-MM-DD):", edtFrom)
+        form.addRow("To (YYYY-MM-DD):", edtTo)
+
+        btns = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel, parent=dlg)
+        form.addRow(btns)
+
+        btns.accepted.connect(dlg.accept)
+        btns.rejected.connect(dlg.reject)
+
+        if dlg.exec_() != QtWidgets.QDialog.Accepted:
+            return
+
+        label = edtLabel.text().strip() or None
+        keyword = edtKeyword.text().strip() or None
+        date_from = edtFrom.date().toString("yyyy-MM-dd")
+        date_to = edtTo.date().toString("yyyy-MM-dd")
+
+        try:
+            rows = search_notes(label=label, keyword=keyword, date_from=date_from, date_to=date_to, limit=500)
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "검색 오류", str(e))
+            return
+
+        # 테이블 반영 (fetch_notes와 동일 포맷)
+        t = self.ui.tableResults
+        t.setRowCount(0)
+        for rid, fpath, lbl, conf, desc, created_at in rows:
+            r = t.rowCount()
+            t.insertRow(r)
+            t.setItem(r, 0, QtWidgets.QTableWidgetItem(str(rid)))
+            t.setItem(r, 1, QtWidgets.QTableWidgetItem(fpath))
+            t.setItem(r, 2, QtWidgets.QTableWidgetItem(lbl or ""))
+            t.setItem(r, 3, QtWidgets.QTableWidgetItem("" if conf is None else f"{float(conf):.2f}"))
+            t.setItem(r, 4, QtWidgets.QTableWidgetItem(desc or ""))
+            t.setItem(r, 5, QtWidgets.QTableWidgetItem(created_at or ""))
+
+        self._last_search = {
+            "label": label,
+            "keyword": keyword,
+            "date_from": date_from,
+            "date_to": date_to,
+        }
+        self._render_rows(rows)
+
+    
+    # 현재 테이블에서 선택된 행들의 id를 모아서 삭제 → 테이블 갱신:
+    def on_delete_selected(self):
+        t = self.ui.tableResults
+        sel = t.selectionModel().selectedRows()  # 행 단위 선택 가정
+        if not sel:
+            QtWidgets.QMessageBox.information(self, "안내", "삭제할 행을 선택하세요.")
+            return
+
+        ids = []
+        for idx in sel:
+            rid_item = t.item(idx.row(), 0)  # 0열(ID)
+            if rid_item:
+                try:
+                    ids.append(int(rid_item.text()))
+                except ValueError:
+                    pass
+        if not ids:
+            QtWidgets.QMessageBox.information(self, "안내", "유효한 ID가 없습니다.")
+            return
+
+        reply = QtWidgets.QMessageBox.question(self, "삭제 확인", f"{len(ids)}개 항목을 삭제할까요?", 
+                                            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+        if reply != QtWidgets.QMessageBox.Yes:
+            return
+
+        try:
+            deleted = delete_notes(ids)
+            QtWidgets.QMessageBox.information(self, "완료", f"삭제됨: {deleted}개")
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "삭제 오류", str(e))
+            return
+
+        self._refresh_results()
+        self.ui.tableResults.clearSelection()
+        self.ui.tableResults.scrollToTop()
+        QtWidgets.QApplication.processEvents()
+
+
+    def _render_rows(self, rows):
+        t = self.ui.tableResults
+        t.setUpdatesEnabled(False)
+        sorting = t.isSortingEnabled()
+        t.setSortingEnabled(False)
+
+        t.clearContents()
+        t.setRowCount(0)
+        for rid, fpath, lbl, conf, desc, created_at in rows:
+            r = t.rowCount()
+            t.insertRow(r)
+            t.setItem(r, 0, QtWidgets.QTableWidgetItem(str(rid)))
+            t.setItem(r, 1, QtWidgets.QTableWidgetItem(fpath))
+            t.setItem(r, 2, QtWidgets.QTableWidgetItem(lbl or ""))
+            t.setItem(r, 3, QtWidgets.QTableWidgetItem("" if conf is None else f"{float(conf):.2f}"))
+            t.setItem(r, 4, QtWidgets.QTableWidgetItem(desc or ""))
+            t.setItem(r, 5, QtWidgets.QTableWidgetItem(created_at or ""))
+
+        t.setSortingEnabled(sorting)
+        t.setUpdatesEnabled(True)
+        t.viewport().update()
+        QtWidgets.QApplication.processEvents()
+
+
+    def _refresh_results(self):
+        try:
+            if self._last_search:
+                ctx = self._last_search
+                rows = search_notes(
+                    label=ctx.get("label"),
+                    keyword=ctx.get("keyword"),
+                    date_from=ctx.get("date_from"),
+                    date_to=ctx.get("date_to"),
+                    limit=500
+                )
+            else:
+                rows = fetch_notes(limit=200)
+            self._render_rows(rows)
+        except Exception as e:
+            print("[REFRESH ERROR]", e)
