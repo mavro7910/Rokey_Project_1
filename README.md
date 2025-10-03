@@ -44,17 +44,16 @@ OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxx
 DB_PATH=app.db
 👉 DB_PATH는 생략 시 app.db 기본값을 사용합니다.
 👉 API Key는 OpenAI 계정에서 발급받아야 합니다.
+'''
 
-협업을 위해 .env는 git에 올리지 않고, .env.example 템플릿 파일을 제공하는 것을 권장합니다.
-
-📂 데이터셋 출처
+## 📂 데이터셋 출처
 본 프로젝트에서는 CarDD (Car Damage Dataset) 를 활용하여 GPT-4o mini 기반 분류 실험을 진행합니다.
 
 CarDD는 차량 외장 손상 이미지 약 4,000장을 포함하고 있으며, 스크래치, 찌그러짐, 페인트 손상 등 다양한 불량 유형을 포함합니다.
 
 CarDD 공식 페이지
 
-🔁 전체 흐름
+## 🔁 전체 흐름
 이미지 업로드 (단일/폴더)
 
 GPT-4o-mini 분류 요청
@@ -65,7 +64,7 @@ GPT-4o-mini 분류 요청
 
 검색/삭제 기능으로 관리
 
-🔧 시스템 구성도
+## 🔧 시스템 구성도
 css
 코드 복사
 [ 사용자 ]
@@ -79,23 +78,27 @@ css
 [ 불량 유형 분류 + 설명 출력 ]
    ↓
 [ 결과 DB 저장 및 화면 표시 ]
-📁 디렉토리 구조 (예시)
+
+## 📁 디렉토리 구조
 css
 코드 복사
 defect_inspector/
 ├── gui/
 │   └── main_app.py
+│   └── main_window.py
 ├── api/
 │   └── openai_api.py
 ├── db/
 │   └── db.py
 ├── utils/
+│   └── config.py
 │   └── file_handler.py
 ├── main.py
 ├── app.db
 ├── .env.example
 └── requirements.txt
-📷 예시 시나리오
+
+## 📷 예시 시나리오
 공정 중 부품 이미지를 촬영
 
 GPT가 자동으로 불량 유형 태깅 (예: “스크래치, confidence=0.82”)
@@ -104,7 +107,7 @@ DB에 날짜·불량 유형 저장
 
 검색어 스크래치, 9월 균열 등으로 빠른 조회
 
-🚀 확장 아이디어
+##🚀 확장 아이디어
 결과를 CSV/Excel로 Export
 
 불량 유형/기간별 통계 대시보드 (matplotlib 시각화)
