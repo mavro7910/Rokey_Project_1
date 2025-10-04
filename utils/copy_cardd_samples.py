@@ -9,7 +9,7 @@ from pathlib import Path
 # 🔧 사용자 수정 영역
 SRC_ROOT = r"C:\ROKEY\SETUP\CARDD_RELEASE\CarDD_COCO"   # 원본 COCO 데이터셋 폴더 (train/test/val 포함)
 DST_ROOT = r"C:\ROKEY\SETUP\CarDD_SAMPLES"              # 결과 저장 폴더
-NUM_SAMPLES = 10                                        # 뽑을 총 이미지 수
+NUM_SAMPLES = 20                                        # 뽑을 총 이미지 수
 SEED = 41                                               # 랜덤 시드
 EXTS = (".jpg", ".jpeg", ".png")                        # 포함할 이미지 확장자
 # ==========================================

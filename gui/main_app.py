@@ -13,6 +13,9 @@ from utils.config import DEFECT_LABELS
 
 from pathlib import Path
 
+# 통계 대시보드 연결
+from gui.stats_view import StatsDashboard
+
 # Action에 Pass 추가 (정상일 때)
 ACTIONS = ["Pass", "Rework", "Scrap", "Hold", "Reject"]
 
@@ -521,3 +524,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self._render_rows(rows)
         except Exception as e:
             print("[REFRESH ERROR]", e)
+
+    # -------- 통계 대시보드 --------
+    def on_view_results(self):
+        dlg = StatsDashboard(get_db_path(), self)
+        dlg.exec_()
