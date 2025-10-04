@@ -1,0 +1,5 @@
+PyQt5>=5.15
+matplotlib>=3.8
+pillow>=10.0
+python-dotenv>=1.0
+sqlite-utils>=3.36
