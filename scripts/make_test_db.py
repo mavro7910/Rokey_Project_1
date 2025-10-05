@@ -54,7 +54,7 @@ locations = ["front bumper", "rear bumper", "hood", "trunk", "door", "roof", "wi
 actions = ["Pass", "Rework", "Scrap", "Hold", "Reject"]
 
 start_date = datetime.now() - timedelta(days=120)  # 4개월 전부터 데이터 생성
-n_rows = 500
+n_rows = 1000
 
 for i in range(n_rows):
     created_at = start_date + timedelta(days=random.randint(0, 120), hours=random.randint(0, 23))

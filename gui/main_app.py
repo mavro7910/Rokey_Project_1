@@ -13,6 +13,10 @@ from utils.config import DEFECT_LABELS
 
 from pathlib import Path
 
+import os
+import sqlite3
+import pandas as pd
+
 # 통계 대시보드 연결
 from gui.stats_view import StatsDashboard
 
@@ -343,7 +347,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if not name_item:
             return
 
-        # ① UserRole(절대경로) → ② 셀 텍스트 → ③ 절대경로 변환 순으로 폴백
+        # UserRole(절대경로) → 셀 텍스트 → 절대경로 변환 순으로 폴백
         fpath = name_item.data(QtCore.Qt.UserRole) or name_item.text() or ""
         try:
             fpath = str(Path(fpath).resolve())
@@ -371,7 +375,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if not bars:
             self.addToolBar(tb)
 
-        self.actSearch = QtWidgets.QAction("Search…", self)
+        self.actSearch = QtWidgets.QAction("Search", self)
         self.actSearch.setShortcut("Ctrl+F")
         self.actSearch.triggered.connect(self.on_search_dialog)
         tb.addAction(self.actSearch)
@@ -382,6 +386,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self.actDelete.triggered.connect(self.on_delete_selected)
         tb.addAction(self.actDelete)
         self.addAction(self.actDelete)
+
+        # --- ADD: Export DB (CSV) 액션 ---
+        tb.addSeparator()
+        self.actExportDBCSV = QtWidgets.QAction("Export DB (CSV)", self)
+        self.actExportDBCSV.setShortcut("Ctrl+E")  # 원하면 변경/제거 가능
+        self.actExportDBCSV.setStatusTip("Export all tables in app.db to CSV files")
+        self.actExportDBCSV.triggered.connect(self.on_export_db_csv)
+        tb.addAction(self.actExportDBCSV)
+        self.addAction(self.actExportDBCSV)
 
     def on_search_dialog(self):
         dlg = QtWidgets.QDialog(self)
@@ -487,6 +500,58 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.tableResults.scrollToTop()
         QtWidgets.QApplication.processEvents()
 
+    def on_export_db_csv(self):
+        try:
+            # 1) DB 경로
+            db_path = get_db_path()
+            if not os.path.exists(db_path):
+                QtWidgets.QMessageBox.warning(
+                    self, "Export DB (CSV)",
+                    f"DB 파일을 찾을 수 없습니다.\n{os.path.abspath(db_path)}"
+                )
+                return
+
+            # 2) 저장할 폴더 선택 (테이블별 개별 CSV 저장)
+            out_dir = QtWidgets.QFileDialog.getExistingDirectory(
+                self, "폴더 선택 (테이블별 CSV 저장)"
+            )
+            if not out_dir:
+                return
+
+            saved_paths = []
+            with sqlite3.connect(db_path) as conn:
+                cur = conn.cursor()
+                # 사용자 테이블 목록 (sqlite 내부 테이블 제외)
+                cur.execute("""
+                    SELECT name FROM sqlite_master
+                    WHERE type='table' AND name NOT LIKE 'sqlite_%'
+                """)
+                tables = [r[0] for r in cur.fetchall()]
+
+                if not tables:
+                    QtWidgets.QMessageBox.information(self, "Export DB (CSV)", "내보낼 테이블이 없습니다.")
+                    return
+
+                # 테이블별 CSV 저장
+                for tname in tables:
+                    try:
+                        df = pd.read_sql_query(f"SELECT * FROM {tname}", conn)
+                        out_path = os.path.join(out_dir, f"{tname}.csv")
+                        df.to_csv(out_path, index=False, encoding="utf-8-sig")  # 엑셀 호환 BOM
+                        saved_paths.append(out_path)
+                    except Exception as te:
+                        print(f"[CSV EXPORT ERROR] table={tname} err={te}")
+
+            if saved_paths:
+                QtWidgets.QMessageBox.information(
+                    self, "Export DB (CSV)", "저장 완료:\n" + "\n".join(saved_paths)
+                )
+            else:
+                QtWidgets.QMessageBox.warning(self, "Export DB (CSV)", "저장된 파일이 없습니다.")
+
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Export DB (CSV) 실패", str(e)) 
+    
     # -------- 기타 --------
     def _is_image_file(self, path: Path) -> bool:
         return path.suffix.lower() in {".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".tif", ".tiff"}

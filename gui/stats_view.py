@@ -2,7 +2,7 @@
 from __future__ import annotations
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTabWidget, QWidget,
-    QComboBox, QCheckBox, QMessageBox
+    QComboBox, QCheckBox, QMessageBox, QFileDialog
 )
 from PyQt5.QtCore import Qt
 
@@ -12,6 +12,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 import numpy as np
+import pandas as pd
 import matplotlib.dates as mdates
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -107,7 +108,17 @@ class StatsDashboard(QDialog):
         self.cmb_period2.currentIndexChanged.connect(self._draw_tab2_trend)
         self.chk_unknown.toggled.connect(self._draw_tab1_stacked)
 
-        # (PNG/CSV는 이후 탭별로 구현 예정이면 여기 연결 추가)
+        # 캐시 변수 Tab-wise CSV caches
+        self._df_tab1 = None
+        self._df_tab2 = None
+        self._df_tab3_defect = None
+        self._df_tab3_severity = None
+        self._df_tab4_location = None
+        self._df_tab4_action = None
+
+        # 버튼 연결
+        self.btn_png.clicked.connect(self.on_save_png)
+        self.btn_csv.clicked.connect(self.on_export_csv)
 
         # ── 초기 로딩 ─────────────────────────────────────────────────
         self._refresh_all()
@@ -362,6 +373,24 @@ class StatsDashboard(QDialog):
         self.fig1.tight_layout()
         self.canvas1.draw()
 
+        # --- CSV for Tab1: defect x severity pivot (one row per defect)
+        cols = ["defect", "minor", "moderate", "severe"]
+        if "unknown" in sev_levels:
+            cols.append("unknown")
+        rows_for_csv = []
+        for d in defects:
+            row = {
+                "defect": d,
+                "minor": pivot[d].get("minor", 0),
+                "moderate": pivot[d].get("moderate", 0),
+                "severe": pivot[d].get("severe", 0),
+            }
+            if "unknown" in sev_levels:
+                row["unknown"] = pivot[d].get("unknown", 0)
+            row["total"] = sum(pivot[d].values())
+            rows_for_csv.append(row)
+        self._df_tab1 = pd.DataFrame(rows_for_csv, columns=cols + ["total"])
+
         # 보조 카드
         rate_list = []
         for d in defects:
@@ -442,6 +471,12 @@ class StatsDashboard(QDialog):
 
         self.fig2.tight_layout()
         self.canvas2.draw()
+
+        # --- ADD: CSV 내보내기용
+        self._df_tab2 = pd.DataFrame({
+            "day": [d.strftime("%Y-%m-%d") for d in x_dates],
+            "count": y_counts
+        })
     # ─────────────────────────────────────────────────────────────────
     # 탭3: 결함 비율 파이차트 + Severity 비율 파이차트
     # ─────────────────────────────────────────────────────────────────
@@ -503,8 +538,18 @@ class StatsDashboard(QDialog):
                     colors=["#a3e1d4", "#ffd777", "#ff9999"])
             ax2.set_title("Severity Ratio (A/B/C)")
 
-        self.fig3.tight_layout()
+        #self.fig3.tight_layout()
         self.canvas3.draw()
+
+        # --- ADD: CSV 내보내기용
+        self._df_tab3_defect = (
+        pd.DataFrame(rows_def, columns=["defect_type", "count"])
+        if rows_def else pd.DataFrame(columns=["defect_type","count"])
+        )
+        self._df_tab3_severity = (
+            pd.DataFrame(rows_sev, columns=["severity", "count"])
+            if rows_sev else pd.DataFrame(columns=["severity","count"])
+        )
     # ─────────────────────────────────────────────────────────────────
     # 탭4: 히트맵 / 가로 막대 / 결함 위치별 비율
     # ─────────────────────────────────────────────────────────────────
@@ -571,5 +616,134 @@ class StatsDashboard(QDialog):
             ax2.pie(counts, labels=acts, autopct="%1.0f%%", startangle=90)
             ax2.set_title("Action Ratio")
 
-        self.fig4.tight_layout()
+        #self.fig4.tight_layout()
         self.canvas4.draw()
+
+        # --- ADD: CSV 내보내기용
+        self._df_tab4_location = (
+            pd.DataFrame(rows_loc, columns=["location", "count"])
+            if rows_loc else pd.DataFrame(columns=["location","count"])
+        )
+        self._df_tab4_action = (
+            pd.DataFrame(rows_act, columns=["action", "count"])
+            if rows_act else pd.DataFrame(columns=["action","count"])
+        )
+
+    # ─────────────────────────────────────────────────────────────────
+    # Save PNG 함수
+    # ─────────────────────────────────────────────────────────────────
+    def _current_fig(self):
+        idx = self.tabs.currentIndex()
+        figs = [self.fig1, self.fig2, self.fig3, self.fig4]
+        return figs[idx] if 0 <= idx < len(figs) else None
+
+    def on_save_png(self):
+        try:
+            # 현재 탭 기준 Figure
+            fig = self._current_fig()
+            if fig is None:
+                QMessageBox.warning(self, "Save PNG", "저장할 차트를 찾지 못했습니다.")
+                return
+
+            # 파일 저장 다이얼로그
+            path, _ = QFileDialog.getSaveFileName(
+                self, "Save chart as PNG", "dashboard.png", "PNG Image (*.png)"
+            )
+            if not path:
+                return
+
+            fig.savefig(path, dpi=200, bbox_inches="tight")
+            QMessageBox.information(self, "Save PNG", f"이미지를 저장했습니다.\n{path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Save PNG 실패", str(e))
+
+    
+    # ─────────────────────────────────────────────────────────────────
+    # Export CSV 함수
+    # ─────────────────────────────────────────────────────────────────
+    def on_export_csv(self):
+        try:
+            idx = self.tabs.currentIndex()
+
+            # 탭1: 한 파일
+            if idx == 0:
+                df = self._df_tab1
+                if df is None or df.empty:
+                    QMessageBox.warning(self, "Export CSV", "내보낼 데이터가 없습니다.")
+                    return
+                path, _ = QFileDialog.getSaveFileName(
+                    self, "Export CSV", "defect_distribution.csv", "CSV Files (*.csv)"
+                )
+                if not path: return
+                df.to_csv(path, index=False, encoding="utf-8-sig")
+                QMessageBox.information(self, "Export CSV", f"저장 완료:\n{path}")
+                return
+
+            # 탭2: 한 파일
+            if idx == 1:
+                df = self._df_tab2
+                if df is None or df.empty:
+                    QMessageBox.warning(self, "Export CSV", "내보낼 데이터가 없습니다.")
+                    return
+                path, _ = QFileDialog.getSaveFileName(
+                    self, "Export CSV", "daily_trend.csv", "CSV Files (*.csv)"
+                )
+                if not path: return
+                df.to_csv(path, index=False, encoding="utf-8-sig")
+                QMessageBox.information(self, "Export CSV", f"저장 완료:\n{path}")
+                return
+
+            # 탭3: 두 파일 (폴더 선택)
+            if idx == 2:
+                if (self._df_tab3_defect is None or self._df_tab3_severity is None or
+                    (self._df_tab3_defect.empty and self._df_tab3_severity.empty)):
+                    QMessageBox.warning(self, "Export CSV", "내보낼 데이터가 없습니다.")
+                    return
+                folder = QFileDialog.getExistingDirectory(self, "폴더 선택 (탭3 CSV 2개 저장)")
+                if not folder: return
+
+                saved = []
+                if self._df_tab3_defect is not None and not self._df_tab3_defect.empty:
+                    p1 = os.path.join(folder, "defect_type_ratio.csv")
+                    self._df_tab3_defect.to_csv(p1, index=False, encoding="utf-8-sig")
+                    saved.append(p1)
+                if self._df_tab3_severity is not None and not self._df_tab3_severity.empty:
+                    p2 = os.path.join(folder, "severity_ratio.csv")
+                    self._df_tab3_severity.to_csv(p2, index=False, encoding="utf-8-sig")
+                    saved.append(p2)
+
+                if saved:
+                    QMessageBox.information(self, "Export CSV", "저장 완료:\n" + "\n".join(saved))
+                else:
+                    QMessageBox.warning(self, "Export CSV", "저장할 유효한 데이터가 없습니다.")
+                return
+
+            # 탭4: 두 파일 (폴더 선택)
+            if idx == 3:
+                if (self._df_tab4_location is None and self._df_tab4_action is None) or \
+                ((self._df_tab4_location is not None and self._df_tab4_location.empty) and
+                    (self._df_tab4_action is not None and self._df_tab4_action.empty)):
+                    QMessageBox.warning(self, "Export CSV", "내보낼 데이터가 없습니다.")
+                    return
+
+                folder = QFileDialog.getExistingDirectory(self, "폴더 선택 (탭4 CSV 2개 저장)")
+                if not folder: return
+
+                saved = []
+                if self._df_tab4_location is not None and not self._df_tab4_location.empty:
+                    p1 = os.path.join(folder, "location_count.csv")
+                    self._df_tab4_location.to_csv(p1, index=False, encoding="utf-8-sig")
+                    saved.append(p1)
+                if self._df_tab4_action is not None and not self._df_tab4_action.empty:
+                    p2 = os.path.join(folder, "action_ratio.csv")
+                    self._df_tab4_action.to_csv(p2, index=False, encoding="utf-8-sig")
+                    saved.append(p2)
+
+                if saved:
+                    QMessageBox.information(self, "Export CSV", "저장 완료:\n" + "\n".join(saved))
+                else:
+                    QMessageBox.warning(self, "Export CSV", "저장할 유효한 데이터가 없습니다.")
+                return
+
+        except Exception as e:
+            QMessageBox.critical(self, "Export CSV 실패", str(e))
