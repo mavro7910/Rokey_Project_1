@@ -157,7 +157,7 @@ CarDD는 차량 외장 손상 이미지 약 4,000장을 포함하고 있으며, 
 ---
 
 ## 🔧 시스템 구성도
-```css
+```txt
 [ 사용자 ]
    ↓
 [ PyQt5 GUI ]
@@ -175,7 +175,8 @@ CarDD는 차량 외장 손상 이미지 약 4,000장을 포함하고 있으며, 
 ---
 
 ## 📁 디렉토리 구조
-```css
+```txt
+
 defect_inspector/
 ├── gui/
 │   └── main_app.py
@@ -224,6 +225,18 @@ python-dotenv>=1.0.0
 
 # Utilities
 pathlib
+```
+
+---
+
+## 🚀 실행 방법 (Quickstart)
+
+```bash
+git clone https://github.com/mavro7910/Rokey_Project_1.git
+cd Rokey_Project_1
+pip install -r requirements.txt
+cp .env.example .env   # 키 입력
+python gui/main_app.py
 ```
 
 ---
