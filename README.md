@@ -52,8 +52,8 @@ GPT 모델 기반의 비전 분석 보조 툴로, **불량 분류·설명 자동
 - **SQLite3** — 경량 데이터베이스  
 - **dotenv (.env)** — 환경 변수 관리  
 - **Matplotlib** — 통계 대시보드 및 시각화
-- **Pandas** - CSV 파일로 내보내기
-- **Numpy** - 
+- **Pandas** - DB를 DataFrame으로 변환, CSV 내보내기 기능
+- **Numpy** - 그래프 데이터 전처리
 
 ---
 
@@ -100,7 +100,7 @@ CarDD는 차량 외장 손상 이미지 약 4,000장을 포함하고 있으며, 
 ### 🚗 시나리오 1. 라인 작업자가 불량 부품을 분류 및 저장
 
 1. **이미지 업로드**  
-   - 사용자가 `Classify` 탭에서 자동차 부품 이미지를 선택합니다.  
+   - 사용자가 `Upload Image` 버튼을 누르고 자동차 부품 이미지를 선택합니다.  
    - `gui/main_app.py` → `get_image_file()` 함수가 실행되어 파일 경로를 불러옵니다.  
    - `_set_preview()`를 통해 썸네일 이미지를 GUI에 미리 표시합니다.
 
@@ -109,18 +109,18 @@ CarDD는 차량 외장 손상 이미지 약 4,000장을 포함하고 있으며, 
      `api/openai_api.py`의 `classify_image()` 함수가 호출되어 GPT-4o mini API로 이미지를 전송합니다.  
    - 프롬프트에는 `util/config.py` 내용에 따라 (`scratch`, `dent`, `crack`, `contamination` 등)이 포함됩니다.
 
-3. **결과 출력**  
-   - GPT 응답(JSON 형태)을 받아 (`label`, `confidence`, `description` 등)이 GUI에 표시됩니다.  
+3. **DB 저장**  
+   - GPT로 받은 응답(JSON 형태)을 사용자가 `Save` 버튼 클릭 시,  
+     `gui/main_app.py`의 `on_save()`가 실행되어 SQLite DB(`app.db`)에 결과를 저장합니다.
+
+4. **결과 출력**  
+   - DB의 (`label`, `confidence`, `description` 등)이 GUI에 표시됩니다.
    - 예:  
      ```text
      label : scratch  
      confidence: 0.92  
      description: 표면에 선형 흠집이 있습니다.  
      ```
-
-4. **DB 저장**  
-   - 사용자가 `Save` 버튼 클릭 시,  
-     `gui/main_app.py`의 `on_save()`가 실행되어 SQLite DB(`app.db`)에 결과를 저장합니다.
 
 5. **저장 확인**  
    - “저장 완료” 메시지 표시 후, `gui/stats_view.py`의 테이블에 새 레코드를 반영할 수 있습니다.
