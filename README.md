@@ -92,8 +92,6 @@ CarDD는 차량 외장 손상 이미지 약 4,000장을 포함하고 있으며, 
 
 ## 📷 예시 시나리오
 
-## 🧪 예시 시나리오
-
 아래는 VisionQC 시스템이 실제로 작동하는 과정을 기반으로 한 예시입니다.  
 각 시나리오는 GUI, GPT API, SQLite DB, 대시보드가 서로 어떻게 연동되는지를 보여줍니다.
 
@@ -133,23 +131,23 @@ CarDD는 차량 외장 손상 이미지 약 4,000장을 포함하고 있으며, 
 
 1. **검색 기능 실행**  
    - `Search` 탭에서 불량 유형(`scratch`, `dent` 등) 또는 기간을 선택하고 `Search` 버튼 클릭.  
-   - `db/db_manager.py` → `query_records()`가 SQLite에서 해당 조건의 데이터를 불러옵니다.
+   - `gui/main_app.py` → `db/db.py` → `search_results()`가 SQLite에서 해당 조건의 데이터를 불러옵니다.
 
 2. **검색 결과 표시**  
    - 결과는 `QTableWidget`으로 표시되며, 각 행에는 이미지 경로 / 불량유형 / Confidence / 날짜가 표시됩니다.  
    - 특정 행을 더블클릭하면 이미지 미리보기 팝업(QDialog)이 실행됩니다.
 
 3. **통계 분석 (Stats Dashboard)**  
-   - 사용자가 `Stats` 탭을 열면,  
-     `gui/stats_view.py`가 실행되어 DB의 전체 데이터를 pandas DataFrame으로 로드합니다.
+   - 사용자가 `View Results` 탭을 열면,  
+     `gui/stats_view.py`가 실행되어 DB의 전체 데이터를 로드합니다.
    - 이후 다음과 같은 시각화가 matplotlib로 렌더링됩니다:
-     - **Pie Chart**: 불량 유형별 비율  
-     - **Bar Chart**: 날짜별 불량 발생 건수  
-     - **Histogram**: Confidence 점수 분포  
+     - **Pie Chart**: 불량 유형, 심각도, 조치(Action) 
+     - **Bar Chart**: 심각도(Severity)별 결함 발생 빈도, 위치별 결함 분포
+     - **Line Chart**: 일자별 불량 발생 추이
 
 4. **CSV 내보내기**  
-   - `Export CSV` 버튼 클릭 시, pandas의 `to_csv()`로 `results_export.csv` 생성  
-   - 생성된 파일은 자동으로 프로젝트 루트 폴더에 저장됩니다.
+   - `Export CSV` 버튼 클릭 시, `on_export_csv()`로 `*.csv` 생성
+   - 생성된 파일은 지정한 폴더에 저장됩니다.
 
 ---
 
