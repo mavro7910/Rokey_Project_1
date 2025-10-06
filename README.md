@@ -7,7 +7,7 @@ GPT 모델 기반의 비전 분석 보조 툴로, **불량 분류·설명 자동
 
 ## 📌 주제 및 선정배경
 자동차 산업에서는 품질 관리(QA/QC)를 위해 불량 부품 이미지를 빠르게 분류하고 기록하는 것이 중요합니다.  
-**자동차 품질 관리 보조 시스템(VisionQC)**는 GPT 기반 시각 인식 모델을 활용하여 불량 이미지를 자동 분류·설명하고, SQLite DB에 체계적으로 저장함으로써 품질 데이터의 축적과 분석을 용이하게 하는 것을 목표로 합니다.
+<strong>자동차 품질 관리 보조 시스템(VisionQC)</strong>는 GPT 기반 시각 인식 모델을 활용하여 불량 이미지를 자동 분류·설명하고, SQLite DB에 체계적으로 저장함으로써 품질 데이터의 축적과 분석을 용이하게 하는 것을 목표로 합니다.
 
 ---
 
@@ -92,13 +92,64 @@ CarDD는 차량 외장 손상 이미지 약 4,000장을 포함하고 있으며, 
 
 ## 📷 예시 시나리오
 
-- 공정 중 **자동차 부품 이미지를 촬영**
-- **GPT가 자동으로 불량 유형을 태깅**
-  - 예: `"scratch", confidence = 0.82`
-- **DB(app.db)** 에 날짜, 불량 유형, 심각도(Severity) 저장
-- **검색 기능**을 통해 “스크래치”, “9월 균열” 등의 키워드로 빠른 조회
-- **대시보드에서 통계 시각화**
-  - 불량 유형별 발생 빈도 / 일자별 추이 / 조치(Action) 비율 확인 가능
+## 🧪 예시 시나리오
+
+아래는 VisionQC 시스템이 실제로 작동하는 과정을 기반으로 한 예시입니다.  
+각 시나리오는 GUI, GPT API, SQLite DB, 대시보드가 서로 어떻게 연동되는지를 보여줍니다.
+
+---
+
+### 🚗 시나리오 1. 라인 작업자가 불량 부품을 분류 및 저장
+
+1. **이미지 업로드**  
+   - 사용자가 `Classify` 탭에서 자동차 부품 이미지를 선택합니다.  
+   - `gui/main_app.py` → `get_image_file()` 함수가 실행되어 파일 경로를 불러옵니다.  
+   - `_set_preview()`를 통해 썸네일 이미지를 GUI에 미리 표시합니다.
+
+2. **GPT 기반 불량 분류 요청**  
+   - 사용자가 `Classify` 버튼을 누르면,  
+     `api/openai_api.py`의 `classify_image()` 함수가 호출되어 GPT-4o mini API로 이미지를 전송합니다.  
+   - 프롬프트에는 `util/config.py` 내용에 따라 (`scratch`, `dent`, `crack`, `contamination` 등)이 포함됩니다.
+
+3. **결과 출력**  
+   - GPT 응답(JSON 형태)을 받아 (`label`, `confidence`, `description` 등)이 GUI에 표시됩니다.  
+   - 예:  
+     ```text
+     label : scratch  
+     confidence: 0.92  
+     description: 표면에 선형 흠집이 있습니다.  
+     ```
+
+4. **DB 저장**  
+   - 사용자가 `Save` 버튼 클릭 시,  
+     `gui/main_app.py`의 `on_save()`가 실행되어 SQLite DB(`app.db`)에 결과를 저장합니다.
+
+5. **저장 확인**  
+   - “저장 완료” 메시지 표시 후, `gui/stats_view.py`의 테이블에 새 레코드를 반영할 수 있습니다.
+
+---
+
+### 📊 시나리오 2. 품질 엔지니어가 불량 데이터를 검색 및 분석
+
+1. **검색 기능 실행**  
+   - `Search` 탭에서 불량 유형(`scratch`, `dent` 등) 또는 기간을 선택하고 `Search` 버튼 클릭.  
+   - `db/db_manager.py` → `query_records()`가 SQLite에서 해당 조건의 데이터를 불러옵니다.
+
+2. **검색 결과 표시**  
+   - 결과는 `QTableWidget`으로 표시되며, 각 행에는 이미지 경로 / 불량유형 / Confidence / 날짜가 표시됩니다.  
+   - 특정 행을 더블클릭하면 이미지 미리보기 팝업(QDialog)이 실행됩니다.
+
+3. **통계 분석 (Stats Dashboard)**  
+   - 사용자가 `Stats` 탭을 열면,  
+     `gui/stats_view.py`가 실행되어 DB의 전체 데이터를 pandas DataFrame으로 로드합니다.
+   - 이후 다음과 같은 시각화가 matplotlib로 렌더링됩니다:
+     - **Pie Chart**: 불량 유형별 비율  
+     - **Bar Chart**: 날짜별 불량 발생 건수  
+     - **Histogram**: Confidence 점수 분포  
+
+4. **CSV 내보내기**  
+   - `Export CSV` 버튼 클릭 시, pandas의 `to_csv()`로 `results_export.csv` 생성  
+   - 생성된 파일은 자동으로 프로젝트 루트 폴더에 저장됩니다.
 
 ---
 
