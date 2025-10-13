@@ -223,19 +223,23 @@ CarDD는 차량 외장 손상 이미지 약 4,000장을 포함하고 있으며, 
 ```text
 Rokey_Project_1/
 ├── gui/
+│   └── __init__.py
 │   └── main_app.py
 │   └── main_window.py
 │   └── stats_view.py
 ├── api/
+│   └── __init__.py
 │   └── openai_api.py
 ├─ assets/
 ├── db/
+│   └── __init__.py
 │   └── db.py
 ├── scripts/
+│   └── cardd_sampler.py 
 │   └── make_test_db.py
 ├── utils/
+│   └── __init__.py
 │   └── config.py
-│   └── cardd_sampler.py 
 │   └── file_handler.py
 ├── main.py
 ├── app.db
