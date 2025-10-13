@@ -48,8 +48,8 @@ GPT 모델 기반의 비전 분석 보조 툴로, **불량 분류·설명 자동
 ## 🧩 사용 기술
 - **Python**
 - **PyQt5** — GUI 구성  
-- **OpenAI API (gpt-4o-mini)** — 불량 유형 및 설명 자동 생성  
-- **SQLite3** — 경량 데이터베이스  
+- **OpenAI API** — 불량 유형 및 설명 자동 생성  
+- **SQLite3** — 경량 데이터베이스
 - **dotenv (.env)** — 환경 변수 관리  
 - **Matplotlib** — 통계 대시보드 및 시각화
 - **Pandas** - DB를 DataFrame으로 변환, CSV 내보내기 기능
