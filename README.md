@@ -280,11 +280,11 @@ openai>=1.12.0
 ## 🚀 실행 방법 (Quickstart)
 
 ```bash
-git clone https://github.com/mavro7910/Rokey_Project_1.git
+git clone <https://github.com/mavro7910/Rokey_Project_1.git>
 cd Rokey_Project_1
 pip install -r requirements.txt
-cp .env.example .env   # 키 입력
-python gui/main_app.py
+cp .env.example .env   # Windows에서는 Copy-Item .env.example .env 이후 .env 에 키 입력
+python main.py
 ```
 
 ---
